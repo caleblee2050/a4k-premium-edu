@@ -41,8 +41,13 @@ app.get('/api/health', (req, res) => {
 // Serve static files in production
 if (isProduction) {
     app.use(express.static(join(__dirname, '../dist')));
-    app.get('*', (req, res) => {
-        res.sendFile(join(__dirname, '../dist/index.html'));
+    // Express 5 compatible catch-all route
+    app.use((req, res, next) => {
+        if (req.path.startsWith('/api')) {
+            next();
+        } else {
+            res.sendFile(join(__dirname, '../dist/index.html'));
+        }
     });
 }
 
