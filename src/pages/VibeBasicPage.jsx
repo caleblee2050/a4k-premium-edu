@@ -131,15 +131,7 @@ export default function VibeBasicPage() {
                             "창의력과 사고력이 벽에 닿을 때,<br className="hidden md:inline" />
                             AI가 제공하는 도전적인 아이디어가 새로운 가능성을 열어줍니다."
                         </blockquote>
-                        <div className="flex items-center justify-center gap-3">
-                            <div className="w-12 h-12 rounded-full bg-navy text-white flex items-center justify-center font-bold">
-                                갈렙
-                            </div>
-                            <div className="text-left">
-                                <p className="font-semibold text-navy">갈렙 (Caleb)</p>
-                                <p className="text-sm text-gray-500">72년생 · 네 자녀의 아빠 · 비개발자 CTO</p>
-                            </div>
-                        </div>
+
                     </div>
                 </section>
 
