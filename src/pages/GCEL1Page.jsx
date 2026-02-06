@@ -232,7 +232,7 @@ export default function GCEL1Page() {
             {/* 신청 모달 */}
             {showModal && (
                 <ApplicationModal
-                    course={{ title: 'GCE L1 부트캠프', price: 150000 }}
+                    course={{ title: 'GCE L1 부트캠프', price: 150000, slug: 'gce-l1' }}
                     onClose={() => setShowModal(false)}
                     onSuccess={handleSuccess}
                 />

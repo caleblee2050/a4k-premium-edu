@@ -216,7 +216,7 @@ export default function VibeBasicPage() {
             {/* 신청 모달 */}
             {showModal && (
                 <ApplicationModal
-                    course={{ title: '바이브코딩 기초', price: 300000 }}
+                    course={{ title: '바이브코딩 기초', price: 300000, slug: 'vibe-basic' }}
                     onClose={() => setShowModal(false)}
                     onSuccess={handleSuccess}
                 />

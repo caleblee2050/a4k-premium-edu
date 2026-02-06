@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import { X, User, Phone, Mail, Briefcase, Calendar, ShieldCheck, CreditCard, Check, Sparkles } from 'lucide-react';
-
-const VALID_CODES = ['A4K2026', 'PREMIUM2026', 'AIPARTNERS'];
+import { API_URL } from '../contexts/AuthContext';
 
 export default function ApplicationModal({ course, onClose, onSuccess }) {
-    const [step, setStep] = useState(1); // 1: 정보입력, 2: 결제방법
+    const [step, setStep] = useState(1);
     const [formData, setFormData] = useState({
         name: '',
         age: '',
@@ -12,7 +11,7 @@ export default function ApplicationModal({ course, onClose, onSuccess }) {
         email: '',
         job: '',
     });
-    const [paymentMethod, setPaymentMethod] = useState(null); // 'voucher' | 'transfer'
+    const [paymentMethod, setPaymentMethod] = useState(null);
     const [voucherCode, setVoucherCode] = useState('');
     const [error, setError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -33,17 +32,35 @@ export default function ApplicationModal({ course, onClose, onSuccess }) {
         setIsSubmitting(true);
         setError('');
 
-        await new Promise(resolve => setTimeout(resolve, 800));
+        try {
+            const payload = {
+                ...formData,
+                course_slug: course.slug,
+                payment_method: paymentMethod,
+                voucher_code: paymentMethod === 'voucher' ? voucherCode : null
+            };
 
-        if (paymentMethod === 'voucher') {
-            if (VALID_CODES.includes(voucherCode.toUpperCase().trim())) {
-                onSuccess({ ...formData, course: course.title, paymentMethod: 'voucher' });
-            } else {
-                setError('유효하지 않은 바우처 코드입니다.');
-                setIsSubmitting(false);
+            const res = await fetch(`${API_URL}/api/applications`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                throw new Error(data.error || '신청 처리 중 오류가 발생했습니다');
             }
-        } else {
-            onSuccess({ ...formData, course: course.title, paymentMethod: 'transfer' });
+
+            onSuccess({
+                ...formData,
+                course: course.title,
+                paymentMethod
+            });
+        } catch (err) {
+            console.error('Application error:', err);
+            setError(err.message);
+            setIsSubmitting(false);
         }
     };
 
@@ -191,8 +208,8 @@ export default function ApplicationModal({ course, onClose, onSuccess }) {
                             <button
                                 onClick={() => setPaymentMethod('voucher')}
                                 className={`p-4 rounded-xl border-2 transition-all ${paymentMethod === 'voucher'
-                                        ? 'border-electric bg-electric/5'
-                                        : 'border-gray-200 hover:border-gray-300'
+                                    ? 'border-electric bg-electric/5'
+                                    : 'border-gray-200 hover:border-gray-300'
                                     }`}
                             >
                                 <ShieldCheck size={28} className={`mx-auto mb-2 ${paymentMethod === 'voucher' ? 'text-electric' : 'text-gray-400'}`} />
@@ -202,8 +219,8 @@ export default function ApplicationModal({ course, onClose, onSuccess }) {
                             <button
                                 onClick={() => setPaymentMethod('transfer')}
                                 className={`p-4 rounded-xl border-2 transition-all ${paymentMethod === 'transfer'
-                                        ? 'border-electric bg-electric/5'
-                                        : 'border-gray-200 hover:border-gray-300'
+                                    ? 'border-electric bg-electric/5'
+                                    : 'border-gray-200 hover:border-gray-300'
                                     }`}
                             >
                                 <CreditCard size={28} className={`mx-auto mb-2 ${paymentMethod === 'transfer' ? 'text-electric' : 'text-gray-400'}`} />

@@ -65,7 +65,7 @@ router.post('/', async (req, res) => {
 
         if (payment_method === 'voucher' && voucher_code) {
             const voucherResult = await db.execute({
-                sql: "SELECT id FROM vouchers WHERE code = ? AND status = 'active'",
+                sql: "SELECT id, course_id, expires_at FROM vouchers WHERE code = ? AND status = 'active'",
                 args: [voucher_code.toUpperCase()],
             });
 
@@ -73,7 +73,22 @@ router.post('/', async (req, res) => {
                 return res.status(400).json({ error: '유효하지 않은 바우처 코드입니다' });
             }
 
-            voucherId = voucherResult.rows[0].id;
+            const voucher = voucherResult.rows[0];
+
+            // 강좌 검증 (바우처가 특정 강좌 전용인 경우)
+            if (voucher.course_id && voucher.course_id !== courseId) {
+                return res.status(400).json({ error: '이 강좌에 사용할 수 없는 바우처입니다' });
+            }
+
+            // 만료일 검증
+            if (voucher.expires_at) {
+                const expiresAt = new Date(voucher.expires_at);
+                if (expiresAt < new Date()) {
+                    return res.status(400).json({ error: '만료된 바우처 코드입니다' });
+                }
+            }
+
+            voucherId = voucher.id;
             paymentStatus = 'confirmed';
 
             // 바우처 사용 처리

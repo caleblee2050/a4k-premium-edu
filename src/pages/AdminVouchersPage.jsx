@@ -19,11 +19,14 @@ export default function AdminVouchersPage() {
     const navigate = useNavigate();
     const { token, isAdmin, loading } = useAuth();
     const [vouchers, setVouchers] = useState([]);
+    const [courses, setCourses] = useState([]);
     const [loadingData, setLoadingData] = useState(true);
     const [showModal, setShowModal] = useState(false);
-    const [newCode, setNewCode] = useState('');
+    const [selectedCourse, setSelectedCourse] = useState('');
+    const [createCount, setCreateCount] = useState(1);
     const [filter, setFilter] = useState('all');
     const [search, setSearch] = useState('');
+    const [selectedVouchers, setSelectedVouchers] = useState(new Set());
 
     useEffect(() => {
         if (!loading && !isAdmin) {
@@ -32,8 +35,16 @@ export default function AdminVouchersPage() {
     }, [loading, isAdmin, navigate]);
 
     useEffect(() => {
-        if (token) fetchVouchers();
+        if (token) {
+            fetchVouchers();
+            fetchCourses();
+        }
     }, [token]);
+
+    // Reset selection when filters change
+    useEffect(() => {
+        setSelectedVouchers(new Set());
+    }, [filter, search]);
 
     const fetchVouchers = async () => {
         try {
@@ -49,8 +60,19 @@ export default function AdminVouchersPage() {
         }
     };
 
+    const fetchCourses = async () => {
+        try {
+            const res = await fetch(`${API_URL}/api/courses`);
+            const data = await res.json();
+            setCourses(data);
+            if (data.length > 0) setSelectedCourse(data[0].id);
+        } catch (error) {
+            console.error('Fetch courses error:', error);
+        }
+    };
+
     const createVoucher = async () => {
-        if (!newCode.trim()) return;
+        if (!selectedCourse) return;
         try {
             const res = await fetch(`${API_URL}/api/vouchers`, {
                 method: 'POST',
@@ -58,12 +80,15 @@ export default function AdminVouchersPage() {
                     'Content-Type': 'application/json',
                     Authorization: `Bearer ${token}`,
                 },
-                body: JSON.stringify({ code: newCode.trim() }),
+                body: JSON.stringify({
+                    course_id: selectedCourse,
+                    count: parseInt(createCount)
+                }),
             });
             if (res.ok) {
-                setNewCode('');
                 setShowModal(false);
                 fetchVouchers();
+                setCreateCount(1);
             }
         } catch (error) {
             console.error('Create error:', error);
@@ -103,15 +128,6 @@ export default function AdminVouchersPage() {
         navigator.clipboard.writeText(code);
     };
 
-    const generateCode = () => {
-        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-        let code = 'A4K-';
-        for (let i = 0; i < 8; i++) {
-            code += chars.charAt(Math.floor(Math.random() * chars.length));
-        }
-        setNewCode(code);
-    };
-
     const filteredVouchers = vouchers.filter(v => {
         if (filter !== 'all' && v.status !== filter) return false;
         if (search && !v.code.toLowerCase().includes(search.toLowerCase())) return false;
@@ -132,6 +148,31 @@ export default function AdminVouchersPage() {
         deleted: '삭제됨',
     };
 
+    const toggleSelectAll = () => {
+        if (selectedVouchers.size === filteredVouchers.length && filteredVouchers.length > 0) {
+            setSelectedVouchers(new Set());
+        } else {
+            setSelectedVouchers(new Set(filteredVouchers.map(v => v.code)));
+        }
+    };
+
+    const toggleSelect = (code) => {
+        const newSelected = new Set(selectedVouchers);
+        if (newSelected.has(code)) {
+            newSelected.delete(code);
+        } else {
+            newSelected.add(code);
+        }
+        setSelectedVouchers(newSelected);
+    };
+
+    const handleBulkCopy = () => {
+        const codes = Array.from(selectedVouchers).join('\n');
+        navigator.clipboard.writeText(codes);
+        alert(`${selectedVouchers.size}개의 코드가 복사되었습니다.`);
+        setSelectedVouchers(new Set());
+    };
+
     if (loading || !isAdmin) {
         return (
             <div className="min-h-screen flex items-center justify-center">
@@ -146,7 +187,7 @@ export default function AdminVouchersPage() {
 
             <main className="flex-1 py-8">
                 <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-                    {/* 헤더 */}
+                    {/* 헤더 & 액션 */}
                     <div className="flex items-center justify-between mb-6">
                         <div>
                             <Link to="/admin/dashboard" className="flex items-center gap-2 text-gray-500 hover:text-navy mb-2">
@@ -155,13 +196,24 @@ export default function AdminVouchersPage() {
                             </Link>
                             <h1 className="text-2xl font-bold text-navy">바우처 관리</h1>
                         </div>
-                        <button
-                            onClick={() => setShowModal(true)}
-                            className="btn-primary flex items-center gap-2"
-                        >
-                            <Plus size={18} />
-                            새 바우처
-                        </button>
+                        <div className="flex gap-2">
+                            {selectedVouchers.size > 0 && (
+                                <button
+                                    onClick={handleBulkCopy}
+                                    className="btn-secondary flex items-center gap-2 bg-white text-navy border-gray-200"
+                                >
+                                    <Copy size={18} />
+                                    {selectedVouchers.size}개 복사
+                                </button>
+                            )}
+                            <button
+                                onClick={() => setShowModal(true)}
+                                className="btn-primary flex items-center gap-2"
+                            >
+                                <Plus size={18} />
+                                새 바우처
+                            </button>
+                        </div>
                     </div>
 
                     {/* 필터 & 검색 */}
@@ -182,8 +234,8 @@ export default function AdminVouchersPage() {
                                     key={f}
                                     onClick={() => setFilter(f)}
                                     className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === f
-                                            ? 'bg-electric text-white'
-                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                        ? 'bg-electric text-white'
+                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                                         }`}
                                 >
                                     {f === 'all' ? '전체' : statusLabels[f]}
@@ -197,30 +249,50 @@ export default function AdminVouchersPage() {
                         <table className="w-full">
                             <thead className="bg-gray-50 border-b">
                                 <tr>
+                                    <th className="px-6 py-4 w-12">
+                                        <input
+                                            type="checkbox"
+                                            checked={filteredVouchers.length > 0 && selectedVouchers.size === filteredVouchers.length}
+                                            onChange={toggleSelectAll}
+                                            className="rounded border-gray-300 text-electric focus:ring-electric cursor-pointer"
+                                        />
+                                    </th>
                                     <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">코드</th>
+                                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">강좌</th>
                                     <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">상태</th>
                                     <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">사용자</th>
-                                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">생성일</th>
+                                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">만료일</th>
                                     <th className="px-6 py-4 text-right text-sm font-semibold text-gray-600">액션</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {loadingData ? (
                                     <tr>
-                                        <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
+                                        <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
                                             <RefreshCw className="animate-spin mx-auto mb-2" size={24} />
                                             로딩 중...
                                         </td>
                                     </tr>
                                 ) : filteredVouchers.length === 0 ? (
                                     <tr>
-                                        <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
+                                        <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
                                             바우처가 없습니다
                                         </td>
                                     </tr>
                                 ) : (
                                     filteredVouchers.map(voucher => (
-                                        <tr key={voucher.id} className="border-b last:border-0 hover:bg-gray-50">
+                                        <tr
+                                            key={voucher.id}
+                                            className={`border-b last:border-0 hover:bg-gray-50 transition-colors ${selectedVouchers.has(voucher.code) ? 'bg-purple-50' : ''}`}
+                                        >
+                                            <td className="px-6 py-4">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedVouchers.has(voucher.code)}
+                                                    onChange={() => toggleSelect(voucher.code)}
+                                                    className="rounded border-gray-300 text-electric focus:ring-electric cursor-pointer"
+                                                />
+                                            </td>
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center gap-2">
                                                     <code className="font-mono font-bold text-navy">{voucher.code}</code>
@@ -233,6 +305,9 @@ export default function AdminVouchersPage() {
                                                     </button>
                                                 </div>
                                             </td>
+                                            <td className="px-6 py-4 text-sm text-gray-600">
+                                                {voucher.course_title || '전체'}
+                                            </td>
                                             <td className="px-6 py-4">
                                                 <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusColors[voucher.status]}`}>
                                                     {statusLabels[voucher.status]}
@@ -242,7 +317,7 @@ export default function AdminVouchersPage() {
                                                 {voucher.used_by_name || '-'}
                                             </td>
                                             <td className="px-6 py-4 text-gray-500 text-sm">
-                                                {new Date(voucher.created_at).toLocaleDateString('ko-KR')}
+                                                {voucher.expires_at ? new Date(voucher.expires_at).toLocaleDateString('ko-KR') : '-'}
                                             </td>
                                             <td className="px-6 py-4 text-right">
                                                 <div className="flex items-center justify-end gap-2">
@@ -285,23 +360,32 @@ export default function AdminVouchersPage() {
                         <h2 className="text-xl font-bold text-navy mb-4">새 바우처 생성</h2>
                         <div className="space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-600 mb-1">바우처 코드</label>
-                                <div className="flex gap-2">
-                                    <input
-                                        type="text"
-                                        value={newCode}
-                                        onChange={(e) => setNewCode(e.target.value.toUpperCase())}
-                                        placeholder="예: A4K-PREMIUM"
-                                        className="flex-1 px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-electric font-mono"
-                                    />
-                                    <button
-                                        onClick={generateCode}
-                                        className="px-4 py-3 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
-                                        title="자동 생성"
-                                    >
-                                        <RefreshCw size={18} />
-                                    </button>
-                                </div>
+                                <label className="block text-sm font-medium text-gray-600 mb-1">대상 강좌</label>
+                                <select
+                                    value={selectedCourse}
+                                    onChange={(e) => setSelectedCourse(e.target.value)}
+                                    className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-electric"
+                                >
+                                    {courses.map(course => (
+                                        <option key={course.id} value={course.id}>
+                                            {course.title}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-600 mb-1">생성 수량</label>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    max="100"
+                                    value={createCount}
+                                    onChange={(e) => setCreateCount(e.target.value)}
+                                    className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-electric"
+                                />
+                                <p className="text-xs text-gray-500 mt-1">
+                                    * 자동으로 코드가 생성되며, 30일 유효기간이 적용됩니다.
+                                </p>
                             </div>
                             <div className="flex gap-3">
                                 <button
@@ -312,10 +396,10 @@ export default function AdminVouchersPage() {
                                 </button>
                                 <button
                                     onClick={createVoucher}
-                                    disabled={!newCode.trim()}
+                                    disabled={!selectedCourse}
                                     className="flex-1 btn-primary disabled:opacity-50"
                                 >
-                                    생성
+                                    생성 ({createCount}개)
                                 </button>
                             </div>
                         </div>

@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS vouchers (
   status TEXT DEFAULT 'active',
   used_by INTEGER REFERENCES users(id),
   used_at DATETIME,
+  expires_at DATETIME,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 

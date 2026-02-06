@@ -22,27 +22,57 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
     }
 });
 
-// 바우처 생성 (관리자)
+// 바우처 생성 (관리자) - 대량 생성 지원
 router.post('/', authenticateToken, requireAdmin, async (req, res) => {
     try {
-        const { code, course_id } = req.body;
+        const { course_id, count = 1 } = req.body;
 
-        // 중복 확인
-        const existing = await db.execute({
-            sql: 'SELECT id FROM vouchers WHERE code = ?',
-            args: [code.toUpperCase()],
-        });
-
-        if (existing.rows.length > 0) {
-            return res.status(400).json({ error: '이미 존재하는 코드입니다' });
+        if (!course_id) {
+            return res.status(400).json({ error: '과정을 선택해야 합니다' });
         }
 
-        const result = await db.execute({
-            sql: 'INSERT INTO vouchers (code, course_id) VALUES (?, ?) RETURNING *',
-            args: [code.toUpperCase(), course_id || null],
+        const courseResult = await db.execute({
+            sql: 'SELECT slug, title FROM courses WHERE id = ?',
+            args: [course_id],
         });
 
-        res.json(result.rows[0]);
+        if (courseResult.rows.length === 0) {
+            return res.status(400).json({ error: '유효하지 않은 과정입니다' });
+        }
+
+        const course = courseResult.rows[0];
+
+        // 접두어 생성 (예: GCE1, VIBE 등)
+        let prefix = 'A4K';
+        if (course.slug.includes('gce-l1')) prefix = 'GCE1';
+        else if (course.slug.includes('gce-l2')) prefix = 'GCE2';
+        else if (course.slug.includes('vibe')) prefix = 'VIBE';
+
+        const vouchers = [];
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 헷갈리는 문자 제외
+
+        // 30일 후 만료
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 30);
+
+        for (let i = 0; i < count; i++) {
+            let code = `${prefix}-`;
+            for (let j = 0; j < 8; j++) {
+                code += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+
+            // Generate formatted expiration string for DB (YYYY-MM-DD HH:MM:SS)
+            const expiresAtStr = expiresAt.toISOString().replace('T', ' ').substring(0, 19);
+
+            await db.execute({
+                sql: 'INSERT INTO vouchers (code, course_id, expires_at) VALUES (?, ?, ?)',
+                args: [code, course_id, expiresAtStr],
+            });
+
+            vouchers.push({ code, course_title: course.title, expires_at: expiresAt });
+        }
+
+        res.json({ message: `${count}개의 바우처가 생성되었습니다`, vouchers });
     } catch (error) {
         console.error('Create voucher error:', error);
         res.status(500).json({ error: '바우처 생성 중 오류가 발생했습니다' });
@@ -90,7 +120,7 @@ router.post('/validate', async (req, res) => {
         const { code } = req.body;
 
         const result = await db.execute({
-            sql: "SELECT * FROM vouchers WHERE code = ? AND status = 'active'",
+            sql: "SELECT v.*, c.title as course_title FROM vouchers v LEFT JOIN courses c ON v.course_id = c.id WHERE v.code = ? AND v.status = 'active'",
             args: [code.toUpperCase()],
         });
 
@@ -98,7 +128,17 @@ router.post('/validate', async (req, res) => {
             return res.status(400).json({ valid: false, error: '유효하지 않은 바우처 코드입니다' });
         }
 
-        res.json({ valid: true, voucher: result.rows[0] });
+        const voucher = result.rows[0];
+
+        // 만료일 체크
+        if (voucher.expires_at) {
+            const expiresAt = new Date(voucher.expires_at);
+            if (expiresAt < new Date()) {
+                return res.status(400).json({ valid: false, error: '만료된 바우처 코드입니다' });
+            }
+        }
+
+        res.json({ valid: true, voucher });
     } catch (error) {
         console.error('Validate voucher error:', error);
         res.status(500).json({ error: '바우처 검증 중 오류가 발생했습니다' });
