@@ -5,6 +5,8 @@ import { AuthProvider } from './contexts/AuthContext'
 import './index.css'
 import App from './App.jsx'
 import VibeBasicPage from './pages/VibeBasicPage.jsx'
+import GCEL1Page from './pages/GCEL1Page.jsx'
+import GCEL2Page from './pages/GCEL2Page.jsx'
 import AdminLogin from './pages/AdminLogin.jsx'
 import AdminDashboard from './pages/AdminDashboard.jsx'
 import AdminVouchersPage from './pages/AdminVouchersPage.jsx'
@@ -19,6 +21,8 @@ createRoot(document.getElementById('root')).render(
                 <Routes>
                     <Route path="/" element={<App />} />
                     <Route path="/course/vibe-basic" element={<VibeBasicPage />} />
+                    <Route path="/course/gce-l1" element={<GCEL1Page />} />
+                    <Route path="/course/gce-l2" element={<GCEL2Page />} />
                     <Route path="/admin/login" element={<AdminLogin />} />
                     <Route path="/admin/dashboard" element={<AdminDashboard />} />
                     <Route path="/admin/vouchers" element={<AdminVouchersPage />} />
@@ -30,3 +34,4 @@ createRoot(document.getElementById('root')).render(
         </BrowserRouter>
     </StrictMode>,
 )
+

@@ -21,6 +21,7 @@ const courses = [
         price: 150000,
         icon: 'award',
         featured: false,
+        detailUrl: '/course/gce-l1',
     },
     {
         id: 2,
@@ -38,6 +39,7 @@ const courses = [
         price: 150000,
         icon: 'award',
         featured: true,
+        detailUrl: '/course/gce-l2',
     },
     {
         id: 3,
