@@ -249,8 +249,8 @@ export default function ApplicationModal({ course, onClose, onSuccess }) {
                             <div className="mt-4 p-4 bg-gray-50 rounded-xl">
                                 <p className="text-sm font-medium text-gray-600 mb-3">입금 계좌 안내</p>
                                 <div className="bg-white rounded-lg p-4 border border-gray-200">
-                                    <p className="text-navy font-bold text-lg">신한은행 110-123-456789</p>
-                                    <p className="text-gray-600 text-sm mt-1">예금주: 에이포케이</p>
+                                    <p className="text-navy font-bold text-lg">기업은행 001-743235-01-031</p>
+                                    <p className="text-gray-600 text-sm mt-1">예금주: (주)에이포케이</p>
                                     <p className="text-electric font-semibold mt-2">₩{course.price.toLocaleString()}</p>
                                 </div>
                                 <p className="text-xs text-gray-500 mt-3">
