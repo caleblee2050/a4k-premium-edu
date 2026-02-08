@@ -39,7 +39,7 @@ router.post('/', async (req, res) => {
             return res.status(400).json({ error: '유효하지 않은 과정입니다' });
         }
 
-        const courseId = courseResult.rows[0].id;
+        const courseId = Number(courseResult.rows[0].id);
 
         // 사용자 생성 또는 찾기
         let userId;
@@ -49,14 +49,14 @@ router.post('/', async (req, res) => {
         });
 
         if (userResult.rows.length > 0) {
-            userId = userResult.rows[0].id;
+            userId = Number(userResult.rows[0].id);
         } else {
             const tempPassword = await bcrypt.hash(Math.random().toString(36), 10);
             const newUser = await db.execute({
                 sql: 'INSERT INTO users (email, password_hash, name, phone, age, job) VALUES (?, ?, ?, ?, ?, ?) RETURNING id',
                 args: [email, tempPassword, name || '', phone || '', age || '', job || ''],
             });
-            userId = newUser.rows[0].id;
+            userId = Number(newUser.rows[0].id);
         }
 
         // 중복 신청 확인
@@ -98,7 +98,7 @@ router.post('/', async (req, res) => {
                 }
             }
 
-            voucherId = voucher.id;
+            voucherId = Number(voucher.id);
             paymentStatus = 'confirmed';
 
             // 바우처 사용 처리
