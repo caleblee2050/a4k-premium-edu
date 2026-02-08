@@ -28,11 +28,13 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
 router.post('/', async (req, res) => {
     try {
         const { name, email, phone, age, job, course_slug, payment_method, voucher_code } = req.body;
+        console.log('[Step 1] Received request:', { name, email, phone, age, job, course_slug, payment_method, voucher_code: voucher_code ? 'provided' : 'none' });
 
         // 과정 찾기
+        console.log('[Step 2] Looking up course:', course_slug);
         const courseResult = await db.execute({
             sql: 'SELECT id FROM courses WHERE slug = ?',
-            args: [course_slug],
+            args: [String(course_slug || '')],
         });
 
         if (courseResult.rows.length === 0) {
@@ -40,26 +42,32 @@ router.post('/', async (req, res) => {
         }
 
         const courseId = Number(courseResult.rows[0].id);
+        console.log('[Step 3] Found courseId:', courseId);
 
         // 사용자 생성 또는 찾기
         let userId;
+        console.log('[Step 4] Looking up user by email:', email);
         const userResult = await db.execute({
             sql: 'SELECT id FROM users WHERE email = ?',
-            args: [email],
+            args: [String(email || '')],
         });
 
         if (userResult.rows.length > 0) {
             userId = Number(userResult.rows[0].id);
+            console.log('[Step 5a] Found existing userId:', userId);
         } else {
+            console.log('[Step 5b] Creating new user');
             const tempPassword = await bcrypt.hash(Math.random().toString(36), 10);
             const newUser = await db.execute({
                 sql: 'INSERT INTO users (email, password_hash, name, phone, age, job) VALUES (?, ?, ?, ?, ?, ?) RETURNING id',
-                args: [email, tempPassword, name || '', phone || '', age || '', job || ''],
+                args: [String(email || ''), tempPassword, String(name || ''), String(phone || ''), String(age || ''), String(job || '')],
             });
             userId = Number(newUser.rows[0].id);
+            console.log('[Step 5b] Created userId:', userId);
         }
 
         // 중복 신청 확인
+        console.log('[Step 6] Checking for duplicate application');
         const existingApplication = await db.execute({
             sql: 'SELECT id FROM applications WHERE user_id = ? AND course_id = ?',
             args: [userId, courseId],
@@ -74,9 +82,10 @@ router.post('/', async (req, res) => {
         let paymentStatus = 'pending';
 
         if (payment_method === 'voucher' && voucher_code) {
+            console.log('[Step 7] Processing voucher:', voucher_code);
             const voucherResult = await db.execute({
                 sql: "SELECT id, course_id, expires_at FROM vouchers WHERE code = ? AND status = 'active'",
-                args: [voucher_code.toUpperCase()],
+                args: [String(voucher_code).toUpperCase()],
             });
 
             if (voucherResult.rows.length === 0) {
@@ -84,9 +93,11 @@ router.post('/', async (req, res) => {
             }
 
             const voucher = voucherResult.rows[0];
+            const voucherCourseId = voucher.course_id ? Number(voucher.course_id) : null;
+            console.log('[Step 8] Voucher found:', { voucherId: voucher.id, voucherCourseId, expires_at: voucher.expires_at });
 
             // 강좌 검증 (바우처가 특정 강좌 전용인 경우)
-            if (voucher.course_id && voucher.course_id !== courseId) {
+            if (voucherCourseId && voucherCourseId !== courseId) {
                 return res.status(400).json({ error: '이 강좌에 사용할 수 없는 바우처입니다' });
             }
 
@@ -102,6 +113,7 @@ router.post('/', async (req, res) => {
             paymentStatus = 'confirmed';
 
             // 바우처 사용 처리
+            console.log('[Step 9] Marking voucher as used');
             await db.execute({
                 sql: "UPDATE vouchers SET status = 'used', used_by = ?, used_at = CURRENT_TIMESTAMP WHERE id = ?",
                 args: [userId, voucherId],
@@ -109,12 +121,14 @@ router.post('/', async (req, res) => {
         }
 
         // 신청 생성
+        console.log('[Step 10] Creating application:', { userId, courseId, voucherId, payment_method, paymentStatus });
         const application = await db.execute({
             sql: `INSERT INTO applications (user_id, course_id, voucher_id, payment_method, payment_status) 
                   VALUES (?, ?, ?, ?, ?) RETURNING *`,
-            args: [userId, courseId, voucherId, payment_method, paymentStatus],
+            args: [userId, courseId, voucherId, String(payment_method || 'transfer'), paymentStatus],
         });
 
+        console.log('[Step 11] Application created successfully:', application.rows[0]);
         res.json({
             success: true,
             application: application.rows[0],
