@@ -339,6 +339,7 @@ export default function AdminApplicationsPage() {
                                                 <div className="flex items-center justify-end gap-2">
                                                     {app.payment_status === 'pending' && (
                                                         <button
+                                                            type="button"
                                                             onClick={() => updateStatus(app.id, 'confirmed')}
                                                             className="px-3 py-1 bg-green-100 text-green-700 rounded-lg text-sm font-medium hover:bg-green-200"
                                                         >
@@ -346,7 +347,12 @@ export default function AdminApplicationsPage() {
                                                         </button>
                                                     )}
                                                     <button
-                                                        onClick={() => deleteApplication(app.id, app.name)}
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.preventDefault();
+                                                            e.stopPropagation();
+                                                            deleteApplication(app.id, app.name);
+                                                        }}
                                                         className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                                                         title="삭제"
                                                     >
