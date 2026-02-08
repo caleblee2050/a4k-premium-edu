@@ -59,6 +59,16 @@ router.post('/', async (req, res) => {
             userId = newUser.rows[0].id;
         }
 
+        // 중복 신청 확인
+        const existingApplication = await db.execute({
+            sql: 'SELECT id FROM applications WHERE user_id = ? AND course_id = ?',
+            args: [userId, courseId],
+        });
+
+        if (existingApplication.rows.length > 0) {
+            return res.status(400).json({ error: '이미 해당 과정에 신청하셨습니다' });
+        }
+
         // 바우처 처리
         let voucherId = null;
         let paymentStatus = 'pending';

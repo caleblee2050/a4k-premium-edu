@@ -167,9 +167,29 @@ export default function AdminVouchersPage() {
     };
 
     const handleBulkCopy = () => {
-        const codes = Array.from(selectedVouchers).join('\n');
-        navigator.clipboard.writeText(codes);
-        alert(`${selectedVouchers.size}개의 코드가 복사되었습니다.`);
+        // Get selected voucher objects with full info
+        const selectedVoucherObjects = filteredVouchers.filter(v => selectedVouchers.has(v.code));
+
+        // Group by course
+        const grouped = {};
+        selectedVoucherObjects.forEach(v => {
+            const courseName = v.course_title || '전체';
+            if (!grouped[courseName]) grouped[courseName] = [];
+            grouped[courseName].push(v.code);
+        });
+
+        // Format as neat text
+        let formattedText = '';
+        Object.entries(grouped).forEach(([courseName, codes]) => {
+            formattedText += `📚 ${courseName}\n`;
+            codes.forEach((code, i) => {
+                formattedText += `${i + 1}. ${code}\n`;
+            });
+            formattedText += '\n';
+        });
+
+        navigator.clipboard.writeText(formattedText.trim());
+        alert(`${selectedVouchers.size}개의 바우처가 복사되었습니다.`);
         setSelectedVouchers(new Set());
     };
 
