@@ -121,8 +121,9 @@ router.post('/', async (req, res) => {
             message: payment_method === 'voucher' ? '무료 수강 신청이 완료되었습니다!' : '신청이 완료되었습니다. 입금 확인 후 안내해드립니다.',
         });
     } catch (error) {
-        console.error('Create application error:', error);
-        res.status(500).json({ error: '신청 처리 중 오류가 발생했습니다' });
+        console.error('Create application error:', error.message);
+        console.error('Stack:', error.stack);
+        res.status(500).json({ error: '신청 처리 중 오류가 발생했습니다: ' + error.message });
     }
 });
 
