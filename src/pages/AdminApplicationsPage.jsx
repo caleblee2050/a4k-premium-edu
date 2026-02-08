@@ -12,7 +12,8 @@ import {
     RefreshCw,
     Calendar,
     CreditCard,
-    Ticket
+    Ticket,
+    Trash2
 } from 'lucide-react';
 
 export default function AdminApplicationsPage() {
@@ -59,6 +60,27 @@ export default function AdminApplicationsPage() {
             fetchApplications();
         } catch (error) {
             console.error('Update error:', error);
+        }
+    };
+
+    const deleteApplication = async (id, name) => {
+        if (!window.confirm(`정말 "${name}"님의 신청을 삭제하시겠습니까?\n\n⚠️ 바우처로 신청한 경우, 해당 바우처는 다시 활성화됩니다.`)) {
+            return;
+        }
+        try {
+            const res = await fetch(`${API_URL}/api/applications/${id}`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            if (res.ok) {
+                fetchApplications();
+            } else {
+                const data = await res.json();
+                alert(data.error || '삭제 중 오류가 발생했습니다');
+            }
+        } catch (error) {
+            console.error('Delete error:', error);
+            alert('삭제 중 오류가 발생했습니다');
         }
     };
 
@@ -109,8 +131,8 @@ export default function AdminApplicationsPage() {
                                 key={f}
                                 onClick={() => setFilter(f)}
                                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === f
-                                        ? 'bg-electric text-white'
-                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                    ? 'bg-electric text-white'
+                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                                     }`}
                             >
                                 {f === 'all' ? '전체' : statusLabels[f]}
@@ -181,14 +203,23 @@ export default function AdminApplicationsPage() {
                                                 {new Date(app.created_at).toLocaleDateString('ko-KR')}
                                             </td>
                                             <td className="px-6 py-4 text-right">
-                                                {app.payment_status === 'pending' && (
+                                                <div className="flex items-center justify-end gap-2">
+                                                    {app.payment_status === 'pending' && (
+                                                        <button
+                                                            onClick={() => updateStatus(app.id, 'confirmed')}
+                                                            className="px-3 py-1 bg-green-100 text-green-700 rounded-lg text-sm font-medium hover:bg-green-200"
+                                                        >
+                                                            확정
+                                                        </button>
+                                                    )}
                                                     <button
-                                                        onClick={() => updateStatus(app.id, 'confirmed')}
-                                                        className="px-3 py-1 bg-green-100 text-green-700 rounded-lg text-sm font-medium hover:bg-green-200"
+                                                        onClick={() => deleteApplication(app.id, app.name)}
+                                                        className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                                        title="삭제"
                                                     >
-                                                        확정
+                                                        <Trash2 size={16} />
                                                     </button>
-                                                )}
+                                                </div>
                                             </td>
                                         </tr>
                                     ))

@@ -149,13 +149,51 @@ router.patch('/:id', authenticateToken, requireAdmin, async (req, res) => {
 
         await db.execute({
             sql: 'UPDATE applications SET payment_status = ? WHERE id = ?',
-            args: [payment_status, id],
+            args: [payment_status, Number(id)],
         });
 
         res.json({ message: '신청 상태가 변경되었습니다' });
     } catch (error) {
         console.error('Update application error:', error);
         res.status(500).json({ error: '신청 상태 변경 중 오류가 발생했습니다' });
+    }
+});
+
+// 신청 삭제 (관리자)
+router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // 먼저 신청 정보를 가져와서 바우처가 사용되었는지 확인
+        const appResult = await db.execute({
+            sql: 'SELECT voucher_id FROM applications WHERE id = ?',
+            args: [Number(id)],
+        });
+
+        if (appResult.rows.length === 0) {
+            return res.status(404).json({ error: '신청을 찾을 수 없습니다' });
+        }
+
+        const application = appResult.rows[0];
+
+        // 바우처가 사용되었다면 다시 활성화
+        if (application.voucher_id) {
+            await db.execute({
+                sql: "UPDATE vouchers SET status = 'active', used_by = NULL, used_at = NULL WHERE id = ?",
+                args: [Number(application.voucher_id)],
+            });
+        }
+
+        // 신청 삭제
+        await db.execute({
+            sql: 'DELETE FROM applications WHERE id = ?',
+            args: [Number(id)],
+        });
+
+        res.json({ message: '신청이 삭제되었습니다' });
+    } catch (error) {
+        console.error('Delete application error:', error);
+        res.status(500).json({ error: '신청 삭제 중 오류가 발생했습니다' });
     }
 });
 
