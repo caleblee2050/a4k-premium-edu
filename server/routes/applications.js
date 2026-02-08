@@ -54,7 +54,7 @@ router.post('/', async (req, res) => {
             const tempPassword = await bcrypt.hash(Math.random().toString(36), 10);
             const newUser = await db.execute({
                 sql: 'INSERT INTO users (email, password_hash, name, phone, age, job) VALUES (?, ?, ?, ?, ?, ?) RETURNING id',
-                args: [email, tempPassword, name, phone, age, job],
+                args: [email, tempPassword, name || '', phone || '', age || '', job || ''],
             });
             userId = newUser.rows[0].id;
         }
