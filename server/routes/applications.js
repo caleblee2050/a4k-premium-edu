@@ -163,6 +163,7 @@ router.patch('/:id', authenticateToken, requireAdmin, async (req, res) => {
 router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const { id } = req.params;
+        console.log('[Delete] Deleting application ID:', id);
 
         // 먼저 신청 정보를 가져와서 바우처가 사용되었는지 확인
         const appResult = await db.execute({
@@ -182,6 +183,7 @@ router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
                 sql: "UPDATE vouchers SET status = 'active', used_by = NULL, used_at = NULL WHERE id = ?",
                 args: [Number(application.voucher_id)],
             });
+            console.log('[Delete] Restored voucher ID:', application.voucher_id);
         }
 
         // 신청 삭제
@@ -190,10 +192,96 @@ router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
             args: [Number(id)],
         });
 
+        console.log('[Delete] Application deleted successfully');
         res.json({ message: '신청이 삭제되었습니다' });
     } catch (error) {
         console.error('Delete application error:', error);
-        res.status(500).json({ error: '신청 삭제 중 오류가 발생했습니다' });
+        res.status(500).json({ error: '신청 삭제 중 오류가 발생했습니다: ' + error.message });
+    }
+});
+
+// 다중 신청 삭제 (관리자)
+router.post('/bulk-delete', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { ids } = req.body;
+
+        if (!ids || !Array.isArray(ids) || ids.length === 0) {
+            return res.status(400).json({ error: '삭제할 신청 ID를 선택해주세요' });
+        }
+
+        console.log('[BulkDelete] Deleting applications:', ids);
+
+        let restoredVouchers = 0;
+        let deletedApps = 0;
+
+        for (const id of ids) {
+            // 바우처 정보 확인
+            const appResult = await db.execute({
+                sql: 'SELECT voucher_id FROM applications WHERE id = ?',
+                args: [Number(id)],
+            });
+
+            if (appResult.rows.length > 0) {
+                const application = appResult.rows[0];
+
+                // 바우처 복원
+                if (application.voucher_id) {
+                    await db.execute({
+                        sql: "UPDATE vouchers SET status = 'active', used_by = NULL, used_at = NULL WHERE id = ?",
+                        args: [Number(application.voucher_id)],
+                    });
+                    restoredVouchers++;
+                }
+
+                // 삭제
+                await db.execute({
+                    sql: 'DELETE FROM applications WHERE id = ?',
+                    args: [Number(id)],
+                });
+                deletedApps++;
+            }
+        }
+
+        console.log(`[BulkDelete] Deleted ${deletedApps} applications, restored ${restoredVouchers} vouchers`);
+        res.json({
+            message: `${deletedApps}개의 신청이 삭제되었습니다`,
+            deletedCount: deletedApps,
+            restoredVouchers: restoredVouchers
+        });
+    } catch (error) {
+        console.error('Bulk delete error:', error);
+        res.status(500).json({ error: '삭제 중 오류가 발생했습니다: ' + error.message });
+    }
+});
+
+// 신청 과정 변경 (관리자)
+router.patch('/:id/course', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { course_id } = req.body;
+
+        // 유효한 과정인지 확인
+        const courseResult = await db.execute({
+            sql: 'SELECT id, title FROM courses WHERE id = ?',
+            args: [Number(course_id)],
+        });
+
+        if (courseResult.rows.length === 0) {
+            return res.status(400).json({ error: '유효하지 않은 과정입니다' });
+        }
+
+        await db.execute({
+            sql: 'UPDATE applications SET course_id = ? WHERE id = ?',
+            args: [Number(course_id), Number(id)],
+        });
+
+        res.json({
+            message: '과정이 변경되었습니다',
+            newCourse: courseResult.rows[0].title
+        });
+    } catch (error) {
+        console.error('Update course error:', error);
+        res.status(500).json({ error: '과정 변경 중 오류가 발생했습니다' });
     }
 });
 

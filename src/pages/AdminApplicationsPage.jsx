@@ -13,7 +13,10 @@ import {
     Calendar,
     CreditCard,
     Ticket,
-    Trash2
+    Trash2,
+    CheckSquare,
+    Square,
+    Edit3
 } from 'lucide-react';
 
 export default function AdminApplicationsPage() {
@@ -22,6 +25,8 @@ export default function AdminApplicationsPage() {
     const [applications, setApplications] = useState([]);
     const [loadingData, setLoadingData] = useState(true);
     const [filter, setFilter] = useState('all');
+    const [selectedIds, setSelectedIds] = useState([]);
+    const [courses, setCourses] = useState([]);
 
     useEffect(() => {
         if (!loading && !isAdmin) {
@@ -30,7 +35,10 @@ export default function AdminApplicationsPage() {
     }, [loading, isAdmin, navigate]);
 
     useEffect(() => {
-        if (token) fetchApplications();
+        if (token) {
+            fetchApplications();
+            fetchCourses();
+        }
     }, [token]);
 
     const fetchApplications = async () => {
@@ -40,10 +48,22 @@ export default function AdminApplicationsPage() {
             });
             const data = await res.json();
             setApplications(data);
+            setSelectedIds([]);
         } catch (error) {
             console.error('Fetch error:', error);
         } finally {
             setLoadingData(false);
+        }
+    };
+
+    const fetchCourses = async () => {
+        try {
+            const res = await fetch(`${API_URL}/api/courses`);
+            const data = await res.json();
+            // GCE L1, L2만 필터링
+            setCourses(data.filter(c => c.slug === 'gce-l1' || c.slug === 'gce-l2'));
+        } catch (error) {
+            console.error('Fetch courses error:', error);
         }
     };
 
@@ -84,6 +104,73 @@ export default function AdminApplicationsPage() {
         }
     };
 
+    const bulkDelete = async () => {
+        if (selectedIds.length === 0) {
+            alert('삭제할 신청을 선택해주세요');
+            return;
+        }
+        if (!window.confirm(`선택한 ${selectedIds.length}개의 신청을 삭제하시겠습니까?\n\n⚠️ 바우처로 신청한 경우, 해당 바우처들은 다시 활성화됩니다.`)) {
+            return;
+        }
+        try {
+            const res = await fetch(`${API_URL}/api/applications/bulk-delete`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({ ids: selectedIds }),
+            });
+            const data = await res.json();
+            if (res.ok) {
+                alert(data.message);
+                fetchApplications();
+            } else {
+                alert(data.error || '삭제 중 오류가 발생했습니다');
+            }
+        } catch (error) {
+            console.error('Bulk delete error:', error);
+            alert('삭제 중 오류가 발생했습니다');
+        }
+    };
+
+    const changeCourse = async (appId, newCourseId) => {
+        try {
+            const res = await fetch(`${API_URL}/api/applications/${appId}/course`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({ course_id: newCourseId }),
+            });
+            const data = await res.json();
+            if (res.ok) {
+                fetchApplications();
+            } else {
+                alert(data.error || '과정 변경 중 오류가 발생했습니다');
+            }
+        } catch (error) {
+            console.error('Change course error:', error);
+        }
+    };
+
+    const toggleSelect = (id) => {
+        setSelectedIds(prev =>
+            prev.includes(id)
+                ? prev.filter(x => x !== id)
+                : [...prev, id]
+        );
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedIds.length === filteredApps.length) {
+            setSelectedIds([]);
+        } else {
+            setSelectedIds(filteredApps.map(a => a.id));
+        }
+    };
+
     const filteredApps = applications.filter(a => {
         if (filter === 'all') return true;
         return a.payment_status === filter;
@@ -114,7 +201,7 @@ export default function AdminApplicationsPage() {
             <Header />
 
             <main className="flex-1 py-8">
-                <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     {/* 헤더 */}
                     <div className="mb-6">
                         <Link to="/admin/dashboard" className="flex items-center gap-2 text-gray-500 hover:text-navy mb-2">
@@ -124,62 +211,108 @@ export default function AdminApplicationsPage() {
                         <h1 className="text-2xl font-bold text-navy">수강 신청 관리</h1>
                     </div>
 
-                    {/* 필터 */}
-                    <div className="glass rounded-xl p-4 mb-6 flex gap-2">
-                        {['all', 'pending', 'confirmed', 'cancelled'].map(f => (
+                    {/* 필터 및 액션 버튼 */}
+                    <div className="glass rounded-xl p-4 mb-6 flex flex-wrap gap-4 items-center justify-between">
+                        <div className="flex gap-2">
+                            {['all', 'pending', 'confirmed', 'cancelled'].map(f => (
+                                <button
+                                    key={f}
+                                    onClick={() => setFilter(f)}
+                                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === f
+                                        ? 'bg-electric text-white'
+                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                        }`}
+                                >
+                                    {f === 'all' ? '전체' : statusLabels[f]}
+                                </button>
+                            ))}
+                        </div>
+
+                        {selectedIds.length > 0 && (
                             <button
-                                key={f}
-                                onClick={() => setFilter(f)}
-                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === f
-                                    ? 'bg-electric text-white'
-                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                    }`}
+                                onClick={bulkDelete}
+                                className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition-colors"
                             >
-                                {f === 'all' ? '전체' : statusLabels[f]}
+                                <Trash2 size={16} />
+                                선택 삭제 ({selectedIds.length})
                             </button>
-                        ))}
+                        )}
                     </div>
 
                     {/* 테이블 */}
-                    <div className="glass rounded-xl overflow-hidden">
-                        <table className="w-full">
+                    <div className="glass rounded-xl overflow-hidden overflow-x-auto">
+                        <table className="w-full min-w-[900px]">
                             <thead className="bg-gray-50 border-b">
                                 <tr>
-                                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">신청자</th>
-                                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">과정</th>
-                                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">결제방법</th>
-                                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">상태</th>
-                                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600">신청일</th>
-                                    <th className="px-6 py-4 text-right text-sm font-semibold text-gray-600">액션</th>
+                                    <th className="px-4 py-4 text-left">
+                                        <button onClick={toggleSelectAll} className="text-gray-400 hover:text-gray-600">
+                                            {filteredApps.length > 0 && selectedIds.length === filteredApps.length ? (
+                                                <CheckSquare size={20} />
+                                            ) : (
+                                                <Square size={20} />
+                                            )}
+                                        </button>
+                                    </th>
+                                    <th className="px-4 py-4 text-left text-sm font-semibold text-gray-600">신청자</th>
+                                    <th className="px-4 py-4 text-left text-sm font-semibold text-gray-600">과정</th>
+                                    <th className="px-4 py-4 text-left text-sm font-semibold text-gray-600">결제방법</th>
+                                    <th className="px-4 py-4 text-left text-sm font-semibold text-gray-600">상태</th>
+                                    <th className="px-4 py-4 text-left text-sm font-semibold text-gray-600">신청일</th>
+                                    <th className="px-4 py-4 text-right text-sm font-semibold text-gray-600">액션</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {loadingData ? (
                                     <tr>
-                                        <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                                        <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
                                             <RefreshCw className="animate-spin mx-auto mb-2" size={24} />
                                             로딩 중...
                                         </td>
                                     </tr>
                                 ) : filteredApps.length === 0 ? (
                                     <tr>
-                                        <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                                        <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
                                             신청 내역이 없습니다
                                         </td>
                                     </tr>
                                 ) : (
                                     filteredApps.map(app => (
                                         <tr key={app.id} className="border-b last:border-0 hover:bg-gray-50">
-                                            <td className="px-6 py-4">
+                                            <td className="px-4 py-4">
+                                                <button
+                                                    onClick={() => toggleSelect(app.id)}
+                                                    className="text-gray-400 hover:text-gray-600"
+                                                >
+                                                    {selectedIds.includes(app.id) ? (
+                                                        <CheckSquare size={20} className="text-electric" />
+                                                    ) : (
+                                                        <Square size={20} />
+                                                    )}
+                                                </button>
+                                            </td>
+                                            <td className="px-4 py-4">
                                                 <div>
                                                     <p className="font-medium text-navy">{app.name}</p>
                                                     <p className="text-sm text-gray-500">{app.email}</p>
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-4 text-gray-700">
-                                                {app.course_title}
+                                            <td className="px-4 py-4">
+                                                <select
+                                                    value={app.course_id}
+                                                    onChange={(e) => changeCourse(app.id, e.target.value)}
+                                                    className="text-sm border border-gray-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-electric/50"
+                                                >
+                                                    {courses.map(course => (
+                                                        <option key={course.id} value={course.id}>
+                                                            {course.title}
+                                                        </option>
+                                                    ))}
+                                                    {!courses.find(c => c.id === app.course_id) && (
+                                                        <option value={app.course_id}>{app.course_title}</option>
+                                                    )}
+                                                </select>
                                             </td>
-                                            <td className="px-6 py-4">
+                                            <td className="px-4 py-4">
                                                 <div className="flex items-center gap-2">
                                                     {app.payment_method === 'voucher' ? (
                                                         <>
@@ -194,15 +327,15 @@ export default function AdminApplicationsPage() {
                                                     )}
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-4">
+                                            <td className="px-4 py-4">
                                                 <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusColors[app.payment_status]}`}>
                                                     {statusLabels[app.payment_status]}
                                                 </span>
                                             </td>
-                                            <td className="px-6 py-4 text-gray-500 text-sm">
+                                            <td className="px-4 py-4 text-gray-500 text-sm">
                                                 {new Date(app.created_at).toLocaleDateString('ko-KR')}
                                             </td>
-                                            <td className="px-6 py-4 text-right">
+                                            <td className="px-4 py-4 text-right">
                                                 <div className="flex items-center justify-end gap-2">
                                                     {app.payment_status === 'pending' && (
                                                         <button
