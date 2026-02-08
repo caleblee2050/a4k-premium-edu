@@ -41,7 +41,7 @@ export default function ApplicationModal({ course, onClose, onSuccess }) {
                 job: formData.job || '',
                 course_slug: course.slug,
                 payment_method: paymentMethod,
-                voucher_code: paymentMethod === 'voucher' ? voucherCode : undefined
+                voucher_code: paymentMethod === 'voucher' ? voucherCode.trim().toUpperCase() : undefined
             };
 
             console.log('Submitting application payload:', payload);
