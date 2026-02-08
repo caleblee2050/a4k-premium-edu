@@ -34,11 +34,17 @@ export default function ApplicationModal({ course, onClose, onSuccess }) {
 
         try {
             const payload = {
-                ...formData,
+                name: formData.name || '',
+                age: formData.age || '',
+                phone: formData.phone || '',
+                email: formData.email || '',
+                job: formData.job || '',
                 course_slug: course.slug,
                 payment_method: paymentMethod,
-                voucher_code: paymentMethod === 'voucher' ? voucherCode : null
+                voucher_code: paymentMethod === 'voucher' ? voucherCode : undefined
             };
+
+            console.log('Submitting application payload:', payload);
 
             const res = await fetch(`${API_URL}/api/applications`, {
                 method: 'POST',
