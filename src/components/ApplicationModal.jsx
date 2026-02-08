@@ -52,7 +52,18 @@ export default function ApplicationModal({ course, onClose, onSuccess }) {
                 body: JSON.stringify(payload)
             });
 
-            const data = await res.json();
+            console.log('Response status:', res.status, res.statusText);
+
+            const responseText = await res.text();
+            console.log('Response body:', responseText);
+
+            let data;
+            try {
+                data = JSON.parse(responseText);
+            } catch (parseErr) {
+                console.error('Failed to parse response as JSON:', parseErr);
+                throw new Error('서버 응답을 처리할 수 없습니다');
+            }
 
             if (!res.ok) {
                 throw new Error(data.error || '신청 처리 중 오류가 발생했습니다');
