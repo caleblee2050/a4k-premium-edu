@@ -14,6 +14,7 @@ export default function CourseCard({
     description,
     curriculum = [],
     price,
+    slug,
     icon = 'book',
     featured = false,
     delay = 0,
@@ -106,7 +107,7 @@ export default function CourseCard({
 
                     {/* 신청하기 버튼 (Secondary) */}
                     <button
-                        onClick={() => onApply({ title, price })}
+                        onClick={() => onApply({ title, price, slug })}
                         className="w-full py-3 px-6 rounded-xl border-2 border-electric text-electric font-semibold flex items-center justify-center gap-2 hover:bg-electric/5 transition-colors"
                     >
                         <span>신청하기</span>
