@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth, API_URL } from '../contexts/AuthContext';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+import ConfirmModal from '../components/ConfirmModal';
 import {
     ArrowLeft,
     FileText,
@@ -27,6 +28,14 @@ export default function AdminApplicationsPage() {
     const [filter, setFilter] = useState('all');
     const [selectedIds, setSelectedIds] = useState([]);
     const [courses, setCourses] = useState([]);
+
+    // 확인 모달 상태
+    const [confirmModal, setConfirmModal] = useState({
+        isOpen: false,
+        title: '',
+        message: '',
+        onConfirm: null,
+    });
 
     useEffect(() => {
         if (!loading && !isAdmin) {
@@ -60,7 +69,6 @@ export default function AdminApplicationsPage() {
         try {
             const res = await fetch(`${API_URL}/api/courses`);
             const data = await res.json();
-            // GCE L1, L2만 필터링
             setCourses(data.filter(c => c.slug === 'gce-l1' || c.slug === 'gce-l2'));
         } catch (error) {
             console.error('Fetch courses error:', error);
@@ -83,10 +91,17 @@ export default function AdminApplicationsPage() {
         }
     };
 
-    const deleteApplication = async (id, name) => {
-        if (!window.confirm(`정말 "${name}"님의 신청을 삭제하시겠습니까?\n\n⚠️ 바우처로 신청한 경우, 해당 바우처는 다시 활성화됩니다.`)) {
-            return;
-        }
+    const handleDeleteClick = (id, name) => {
+        setConfirmModal({
+            isOpen: true,
+            title: '신청 삭제',
+            message: `정말 "${name}"님의 신청을 삭제하시겠습니까?\n\n⚠️ 바우처로 신청한 경우, 해당 바우처는 다시 활성화됩니다.`,
+            onConfirm: () => executeDelete(id),
+        });
+    };
+
+    const executeDelete = async (id) => {
+        setConfirmModal({ ...confirmModal, isOpen: false });
         try {
             const res = await fetch(`${API_URL}/api/applications/${id}`, {
                 method: 'DELETE',
@@ -104,14 +119,21 @@ export default function AdminApplicationsPage() {
         }
     };
 
-    const bulkDelete = async () => {
+    const handleBulkDeleteClick = () => {
         if (selectedIds.length === 0) {
             alert('삭제할 신청을 선택해주세요');
             return;
         }
-        if (!window.confirm(`선택한 ${selectedIds.length}개의 신청을 삭제하시겠습니까?\n\n⚠️ 바우처로 신청한 경우, 해당 바우처들은 다시 활성화됩니다.`)) {
-            return;
-        }
+        setConfirmModal({
+            isOpen: true,
+            title: '선택 삭제',
+            message: `선택한 ${selectedIds.length}개의 신청을 삭제하시겠습니까?\n\n⚠️ 바우처로 신청한 경우, 해당 바우처들은 다시 활성화됩니다.`,
+            onConfirm: executeBulkDelete,
+        });
+    };
+
+    const executeBulkDelete = async () => {
+        setConfirmModal({ ...confirmModal, isOpen: false });
         try {
             const res = await fetch(`${API_URL}/api/applications/bulk-delete`, {
                 method: 'POST',
@@ -217,6 +239,7 @@ export default function AdminApplicationsPage() {
                             {['all', 'pending', 'confirmed', 'cancelled'].map(f => (
                                 <button
                                     key={f}
+                                    type="button"
                                     onClick={() => setFilter(f)}
                                     className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === f
                                         ? 'bg-electric text-white'
@@ -230,7 +253,8 @@ export default function AdminApplicationsPage() {
 
                         {selectedIds.length > 0 && (
                             <button
-                                onClick={bulkDelete}
+                                type="button"
+                                onClick={handleBulkDeleteClick}
                                 className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition-colors"
                             >
                                 <Trash2 size={16} />
@@ -245,7 +269,11 @@ export default function AdminApplicationsPage() {
                             <thead className="bg-gray-50 border-b">
                                 <tr>
                                     <th className="px-4 py-4 text-left">
-                                        <button onClick={toggleSelectAll} className="text-gray-400 hover:text-gray-600">
+                                        <button
+                                            type="button"
+                                            onClick={toggleSelectAll}
+                                            className="text-gray-400 hover:text-gray-600"
+                                        >
                                             {filteredApps.length > 0 && selectedIds.length === filteredApps.length ? (
                                                 <CheckSquare size={20} />
                                             ) : (
@@ -280,6 +308,7 @@ export default function AdminApplicationsPage() {
                                         <tr key={app.id} className="border-b last:border-0 hover:bg-gray-50">
                                             <td className="px-4 py-4">
                                                 <button
+                                                    type="button"
                                                     onClick={() => toggleSelect(app.id)}
                                                     className="text-gray-400 hover:text-gray-600"
                                                 >
@@ -348,11 +377,7 @@ export default function AdminApplicationsPage() {
                                                     )}
                                                     <button
                                                         type="button"
-                                                        onClick={(e) => {
-                                                            e.preventDefault();
-                                                            e.stopPropagation();
-                                                            deleteApplication(app.id, app.name);
-                                                        }}
+                                                        onClick={() => handleDeleteClick(app.id, app.name)}
                                                         className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                                                         title="삭제"
                                                     >
@@ -370,6 +395,18 @@ export default function AdminApplicationsPage() {
             </main>
 
             <Footer />
+
+            {/* 확인 모달 */}
+            <ConfirmModal
+                isOpen={confirmModal.isOpen}
+                title={confirmModal.title}
+                message={confirmModal.message}
+                onConfirm={confirmModal.onConfirm}
+                onCancel={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+                confirmText="삭제"
+                cancelText="취소"
+                danger={true}
+            />
         </div>
     );
 }
